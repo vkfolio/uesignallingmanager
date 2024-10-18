@@ -1,0 +1,32 @@
+{
+    "matchmaker": {
+        "address": "127.0.0.1",
+        "port": 9999
+    },
+    "network": {
+        "publicIp": "192.168.0.195",
+        "localIp": "127.0.0.1"
+    },
+    "game": {
+        "path": "D:\\dsbuilds\\100\\Windows",
+        "exe": "Desara.exe"
+    },
+    "servers": [
+        {
+            "name": "server1",
+            "httpPort": 7080,
+            "streamerPort": 8888,
+            "sfuPort": 7001,
+            "publicDomain": "pixelstream4090.a.com",
+            "gameArgs": "-nosound -PixelStreamingIP=localhost -PixelStreamingPort=8888 ResX=1350 ResY=1080 -game -forceres -renderOffscreen -unAttended -d3d12"
+        },
+        {
+            "name": "server2",
+            "httpPort": 7081,
+            "streamerPort": 8887,
+            "sfuPort": 7002,
+            "publicDomain": "pixelstream4091.a.com",
+            "gameArgs": "-nosound -PixelStreamingIP=localhost -PixelStreamingPort=8887 ResX=1350 ResY=1080 -game -forceres -renderOffscreen -unAttended -d3d12"
+        }
+    ]
+}

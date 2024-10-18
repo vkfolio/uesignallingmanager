@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signaling Servers Manager</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Custom Tailwind config for dark mode */
+        html {
+            color-scheme: dark;
+        }
+
+        body {
+            background-color: #1a202c;
+        }
+
+        .dark-bg {
+            background-color: #2d3748;
+        }
+
+        .dark-border {
+            border-color: #4a5568;
+        }
+
+        .dark-text {
+            color: #a0aec0;
+        }
+
+        .primary-text {
+            color: #63b3ed;
+        }
+
+        .primary-btn {
+            background-color: #3182ce;
+        }
+
+        .primary-btn:hover {
+            background-color: #63b3ed;
+        }
+
+        .secondary-btn {
+            background-color: #ecc94b;
+        }
+
+        .secondary-btn:hover {
+            background-color: #faf089;
+        }
+
+        /* Additional layout improvements */
+        .container {
+            max-width: 80%;
+            margin: 0 auto;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col items-center py-10">
+
+    <!-- Title -->
+    <h1 class="text-4xl font-bold text-white mb-8">Desara Node Signalling Servers</h1>
+
+    <div class="container mb-8">
+        <div class="table-container">
+            <table class="table-auto dark-bg shadow-lg rounded-lg w-full">
+                <thead>
+                    <tr class="bg-gray-700">
+                        <th class="px-4 py-2 text-left dark-text">Server Name</th>
+                        <th class="px-4 py-2 text-left dark-text">Public IP</th>
+                        <th class="px-4 py-2 text-left dark-text">Public Domain</th>
+                        <th class="px-4 py-2 text-left dark-text">Local IP</th>
+                        <th class="px-4 py-2 text-left dark-text">Port</th>
+                        <th class="px-4 py-2 text-left dark-text">Status</th>
+                        <th class="px-4 py-2 text-left dark-text">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="serversTableBody" class="dark-text"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Metrics Section -->
+    <div class="container grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div class="dark-bg shadow-lg rounded-lg p-4">
+            <h2 class="text-lg font-semibold text-white mb-4">CPU Load (%)</h2>
+            <canvas id="cpuChart"></canvas>
+        </div>
+        <div class="dark-bg shadow-lg rounded-lg p-4">
+            <h2 class="text-lg font-semibold text-white mb-4">Memory Usage (GB)</h2>
+            <canvas id="memoryChart"></canvas>
+        </div>
+        <div class="dark-bg shadow-lg rounded-lg p-4">
+            <h2 class="text-lg font-semibold text-white mb-4">GPU Memory Usage (GB)</h2>
+            <canvas id="gpuChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let servers = [];
+        const MAX_POINTS = 180;
+
+        window.onload = function () {
+            fetchServerStatus();
+            initializeCharts();
+            fetchHistoricalMetrics();
+            setInterval(fetchSystemStats, 5000);
+        };
+
+        function fetchServerStatus() {
+            fetch('/server-status')
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.getElementById('serversTableBody');
+                    tableBody.innerHTML = '';
+
+                    data.forEach(server => {
+                        const row = `
+                            <tr id="${server.name}-row" class="dark-border">
+                                <td class="border px-4 py-2 dark-border dark-text">${server.name}</td>
+                                <td class="border px-4 py-2 dark-border"><a href="http://${server.publicIp}:${server.httpPort}" target="_blank" class="primary-text underline">${server.publicIp}:${server.httpPort}</a></td>
+                                <td class="border px-4 py-2 dark-border"><a href="http://${server.publicDomain}" target="_blank" class="primary-text underline">${server.publicDomain}</a></td>
+                                <td class="border px-4 py-2 dark-border"><a href="http://${server.localIp}:${server.httpPort}" target="_blank" class="primary-text underline">${server.localIp}:${server.httpPort}</a></td>
+                                <td class="border px-4 py-2 dark-border dark-text">${server.httpPort}</td>
+                                <td class="border px-4 py-2 dark-border dark-text" id="${server.name}-status">${server.status}</td>
+                                <td class="border px-4 py-2 dark-border flex space-x-2">
+                                    <button class="primary-btn text-white font-bold py-2 px-4 rounded hover:primary-btn-hover" 
+                                        onclick="toggleServer('${server.name}')">${server.status === 'running' ? 'Stop' : 'Start'}</button>
+                                    <button class="secondary-btn text-white font-bold py-2 px-4 rounded hover:secondary-btn-hover" 
+                                        onclick="restartServer('${server.name}')">Restart</button>
+                                </td>
+                            </tr>
+                        `;
+                        tableBody.innerHTML += row;
+                    });
+                })
+                .catch(error => console.error('Error fetching server status:', error));
+        }
+
+        function toggleServer(name) {
+            const statusElement = document.getElementById(`${name}-status`);
+            if (statusElement.textContent === 'running') {
+                stopServer(name);
+            } else {
+                startServer(name);
+            }
+        }
+
+        function startServer(name) {
+            fetch('/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        updateServerStatus(name, 'running');
+                    } else {
+                        alert(data.error);
+                    }
+                })
+                .catch(error => {
+                    alert(`Failed to start ${name}: ${error}`);
+                });
+        }
+
+        function stopServer(name) {
+            fetch('/stop', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        updateServerStatus(name, 'stopped');
+                    } else {
+                        alert(data.error);
+                    }
+                })
+                .catch(error => {
+                    alert(`Failed to stop ${name}: ${error}`);
+                });
+        }
+
+        function restartServer(name) {
+            fetch('/restart', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        updateServerStatus(name, 'running');
+                        alert(`${name} restarted successfully`);
+                    } else {
+                        alert(data.error);
+                    }
+                })
+                .catch(error => {
+                    alert(`Failed to restart ${name}: ${error}`);
+                });
+        }
+
+        function updateServerStatus(name, status) {
+            const statusElement = document.getElementById(`${name}-status`);
+            const button = document.querySelector(`#${name}-row button`);
+            statusElement.textContent = status;
+            button.textContent = status === 'running' ? 'Stop' : 'Start';
+        }
+
+        function initializeCharts() {
+            window.cpuChart = createLineChart('cpuChart', 'CPU Load (%)');
+            window.memoryChart = createLineChart('memoryChart', 'Memory Usage (GB)');
+            window.gpuChart = createLineChart('gpuChart', 'GPU Memory Usage (GB)');
+        }
+
+        function createLineChart(canvasId, label) {
+            return new Chart(document.getElementById(canvasId).getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: label,
+                        data: [],
+                        borderColor: `hsl(200, 100%, 70%)`,
+                        fill: false
+                    }]
+                },
+                options: {
+                    scales: { y: { beginAtZero: true } },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: 'white'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function fetchHistoricalMetrics() {
+            fetch('/get-metrics')
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(row => {
+                        const timeLabel = new Date(row.timestamp * 1000).toLocaleTimeString();
+                        updateChart(window.cpuChart, timeLabel, row.cpu_load);
+                        updateChart(window.memoryChart, timeLabel, row.memory_used);
+                        updateChart(window.gpuChart, timeLabel, row.gpu_vram_used);
+                    });
+                })
+                .catch(error => console.error('Error fetching historical metrics:', error));
+        }
+
+        function fetchSystemStats() {
+            fetch('/system-stats')
+                .then(response => response.json())
+                .then(data => {
+                    const timeNow = new Date().toLocaleTimeString();
+                    updateChart(window.cpuChart, timeNow, data.cpu);
+                    updateChart(window.memoryChart, timeNow, data.memory.used);
+                    updateChart(window.gpuChart, timeNow, data.gpu.vramUsed);
+                })
+                .catch(error => console.error('Error fetching system stats:', error));
+        }
+
+        function updateChart(chart, label, value) {
+            if (chart.data.labels.length >= MAX_POINTS) {
+                chart.data.labels.shift();
+                chart.data.datasets[0].data.shift();
+            }
+            chart.data.labels.push(label);
+            chart.data.datasets[0].data.push(value);
+            chart.update();
+        }
+    </script>
+</body>
+
+</html>
