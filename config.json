@@ -1,4 +1,7 @@
 {
+    "common": {
+        "signallingserver": "C:/Users/vigne/Documents/signallingservers/SignallingWebServer/cirrus.js"
+    },
     "matchmaker": {
         "address": "127.0.0.1",
         "port": 9999

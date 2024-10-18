@@ -14,6 +14,7 @@ app.use(express.static('public'));
 const port = 3900;
 const configPath = path.join(__dirname, 'config.json');
 let matchmaker = {};
+let common = {};
 let network = {};
 let game = {};
 let servers = [];
@@ -43,6 +44,7 @@ function loadServers() {
         const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
         matchmaker = config.matchmaker;
         network = config.network;
+        common = config.common;
         game = config.game;  // Load game path and executable
         servers = config.servers.map(server => ({
             ...server,
@@ -115,7 +117,7 @@ app.get('/server-status', (req, res) => {
 function startServerAndGame(server) {
     // Start signaling server process
     server.signalingProcess = spawn('node', [
-        'C:/Users/vigne/Documents/signallingservers/SignallingWebServer/cirrus.js',
+        common.signallingserver,
         '--UseMatchmaker', 'true',
         '--MatchmakerAddress', matchmaker.address,
         '--MatchmakerPort', matchmaker.port,
